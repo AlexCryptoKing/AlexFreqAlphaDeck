@@ -1,0 +1,135 @@
+{
+  "bots": [
+    {
+      "name": "BandSniper-V18-9000",
+      "url": "http://192.168.0.210:9000",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "AlexBandSniperV18MLAIM"
+    },
+    {
+      "name": "BandSniper-MLAI-9010",
+      "url": "http://192.168.0.210:9010",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "AlexBandSniperV18MLAI"
+    },
+    {
+      "name": "Divergence-V4-9020",
+      "url": "http://192.168.0.210:9020",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "Alex_DivergenceV4"
+    },
+    {
+      "name": "BandSniper-LIVE-9030",
+      "url": "http://192.168.0.210:9030",
+      "username": "",
+      "password": "",
+      "mode": "live",
+      "strategy": "AlexBandSniperV18MLAIM"
+    },
+    {
+      "name": "BandSniper-9040",
+      "url": "http://192.168.0.210:9040",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "AlexBandSniperV18MLAIM"
+    },
+    {
+      "name": "NexusForge-V8-9050",
+      "url": "http://192.168.0.210:9050",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "AlexNexusForgeV8AIV2"
+    },
+    {
+      "name": "Divergence-Optuna-9060",
+      "url": "http://192.168.0.210:9060",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "Alex_Divergence_Optuna"
+    },
+    {
+      "name": "NinjaAI-V4-9070",
+      "url": "http://192.168.0.210:9070",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "NinjaAI_V4"
+    },
+    {
+      "name": "NinjaAI-V4-9080",
+      "url": "http://192.168.0.210:9080",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "NinjaAI_V4"
+    },
+    {
+      "name": "Divergence-V41-9090",
+      "url": "http://192.168.0.210:9090",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "Alex_DivergenceV41"
+    },
+    {
+      "name": "Divergence-V5-9100",
+      "url": "http://192.168.0.210:9100",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "Alex_DivergenceV5"
+    },
+    {
+      "name": "ANF-V9-9110",
+      "url": "http://192.168.0.210:9110",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "ANFV9"
+    },
+    {
+      "name": "AlexBattleTankProV7-9120",
+      "url": "http://192.168.0.210:9120",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "AlexBattleTankProV7"
+    },
+    {
+      "name": "GKD_FisherTranfsfromV53_ML-9140",
+      "url": "http://192.168.0.210:9140",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "GKD_FisherTranfsfromV53_ML"
+    },
+    {
+      "name": "GKD_FisherTranfsfromV52_ML-9150",
+      "url": "http://192.168.0.210:9150",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "GKD_FisherTranfsfromV53_ML"
+    },
+      "name": "AlexNexusForgeV8AIV3-9120",
+      "url": "http://192.168.0.231:9020",
+      "username": "",
+      "password": "",
+      "mode": "dry_run",
+      "strategy": "AlexNexusForgeV8AIV3"
+    }
+  ],
+  "summary_schedule": {
+    "times": ["08:00", "14:00", "20:00"],
+    "timezone": "Europe/Berlin"
+  }
+}

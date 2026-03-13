@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* AlexFinanceData Dark Theme Colors */
+:root {
+  --background: 220 13% 5%;
+  --foreground: 213 27% 92%;
+  --card: 220 16% 11%;
+  --card-foreground: 213 27% 92%;
+  --popover: 220 16% 11%;
+  --popover-foreground: 213 27% 92%;
+  --primary: 212 100% 67%;
+  --primary-foreground: 220 13% 5%;
+  --secondary: 220 16% 14%;
+  --secondary-foreground: 213 27% 92%;
+  --muted: 220 16% 14%;
+  --muted-foreground: 215 14% 55%;
+  --accent: 137 55% 46%;
+  --accent-foreground: 220 13% 5%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 213 27% 92%;
+  --border: 215 14% 21%;
+  --input: 215 14% 21%;
+  --ring: 212 100% 67%;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: 220 13% 5%;
+  --foreground: 213 27% 92%;
+  --card: 220 16% 11%;
+  --card-foreground: 213 27% 92%;
+  --popover: 220 16% 11%;
+  --popover-foreground: 213 27% 92%;
+  --primary: 212 100% 67%;
+  --primary-foreground: 220 13% 5%;
+  --secondary: 220 16% 14%;
+  --secondary-foreground: 213 27% 92%;
+  --muted: 220 16% 14%;
+  --muted-foreground: 215 14% 55%;
+  --accent: 137 55% 46%;
+  --accent-foreground: 220 13% 5%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 213 27% 92%;
+  --border: 215 14% 21%;
+  --input: 215 14% 21%;
+  --ring: 212 100% 67%;
+}
+
+/* Light mode - also using dark theme as default since AlexFinanceData is dark */
+body {
+  @apply bg-[#0f1419] text-[#e6edf3];
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Card styling matching AlexFinanceData */
+.card-af {
+  @apply bg-[#161b22] border border-[#30363d] rounded-xl;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.card-af:hover {
+  @apply border-[#58a6ff];
+  transform: translateY(-2px);
+}
+
+/* Header gradient */
+.header-gradient {
+  background: linear-gradient(135deg, #1a2332 0%, #0f1419 100%);
+}
+
+/* Text gradient for titles */
+.text-gradient {
+  background: linear-gradient(90deg, #58a6ff, #3fb950);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Navigation styling */
+.nav-link {
+  @apply text-[#8b949e] border-b-2 border-transparent;
+  transition: all 0.3s;
+}
+
+.nav-link:hover, .nav-link.active {
+  @apply text-[#58a6ff] border-b-[#58a6ff];
+}
+
+/* Scrollbar styling matching dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-[#0f1419];
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-[#30363d] rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-[#58a6ff];
+}
+
+/* Status colors */
+.status-healthy {
+  @apply text-[#3fb950];
+}
+
+.status-warning {
+  @apply text-[#d29922];
+}
+
+.status-error {
+  @apply text-[#f85149];
+}
+
+/* Button styling */
+.btn-primary {
+  @apply bg-[#238636] hover:bg-[#2ea043] text-white px-4 py-2 rounded-lg;
+  transition: all 0.2s;
+}
+
+.btn-secondary {
+  @apply bg-[#21262d] hover:bg-[#30363d] text-[#c9d1d9] border border-[#30363d] px-4 py-2 rounded-lg;
+  transition: all 0.2s;
+}

@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""
+Freqtrade Analytics Pipeline
+============================
+Extracts data from all Freqtrade bots and loads into PostgreSQL
+Runs every 5 minutes via cron
+"""
+
+import json
+import requests
+import psycopg2
+from datetime import datetime, timedelta
+from pathlib import Path
+import logging
+import sys
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/app/data/pipeline.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Database config
+DB_CONFIG = {
+    # Analytics DB is hosted on the multibot stack (192.168.0.210)
+    'host': '192.168.0.210',
+    'database': 'freqtrade_analytics',
+    'user': 'analytics',
+    'password': 'analytics!'
+}
+
+# Bot config
+# V4: Bot URLs - names are fetched automatically from freqtrade API
+BOTS = [
+    {"url": "http://192.168.0.210:9000", "fallback_name": "Bot-9000"},
+    {"url": "http://192.168.0.210:9010", "fallback_name": "Bot-9010"},
+    {"url": "http://192.168.0.210:9020", "fallback_name": "Bot-9020"},
+    {"url": "http://192.168.0.210:9030", "fallback_name": "Bot-9030"},
+    {"url": "http://192.168.0.210:9040", "fallback_name": "Bot-9040"},
+    {"url": "http://192.168.0.210:9050", "fallback_name": "Bot-9050"},
+    {"url": "http://192.168.0.210:9060", "fallback_name": "Bot-9060"},
+    {"url": "http://192.168.0.210:9070", "fallback_name": "Bot-9070"},
+    {"url": "http://192.168.0.210:9080", "fallback_name": "Bot-9080"},
+    {"url": "http://192.168.0.210:9090", "fallback_name": "Bot-9090"},
+    {"url": "http://192.168.0.210:9100", "fallback_name": "Bot-9100"},
+    {"url": "http://192.168.0.210:9110", "fallback_name": "Bot-9110"},
+    {"url": "http://192.168.0.210:9120", "fallback_name": "Bot-9120"},
+    {"url": "http://192.168.0.210:9130", "fallback_name": "Bot-9130"},
+    {"url": "http://192.168.0.210:9140", "fallback_name": "Bot-9140"},
+    {"url": "http://192.168.0.210:9150", "fallback_name": "Bot-9150"},
+]
+
+API_USER = "AlexCryptoKing"
+API_PASS = "Serial150875#"
+
+def get_db_connection():
+    """Get PostgreSQL connection"""
+    return psycopg2.connect(**DB_CONFIG)
+
+def fetch_bot_name(url, headers):
+    """Fetch real bot name from freqtrade API"""
+    # Extract port from URL for unique identification
+    try:
+        port = url.split(':')[-1].split('/')[0]
+    except:
+        port = "unknown"
+    
+    try:
+        # Try to get bot name from show_config
+        config_resp = requests.get(
+            f"{url}/api/v1/show_config",
+            headers=headers,
+            timeout=60
+        )
+        if config_resp.status_code == 200:
+            config = config_resp.json()
+            # Bot name might be in different places depending on freqtrade version
+            bot_name = config.get('bot_name')
+            
+            # If bot_name is default "freqtrade", use strategy + port for uniqueness
+            if not bot_name or bot_name == "freqtrade":
+                strategy = config.get('strategy', 'Unknown')
+                max_open_trades = config.get('max_open_trades', '')
+                bot_name = f"{strategy}-{port}"
+            
+            return bot_name
+    except Exception as e:
+        logger.debug(f"Could not fetch config from {url}: {e}")
+    
+    # Fallback: try to get from status endpoint
+    try:
+        status_resp = requests.get(
+            f"{url}/api/v1/status",
+            headers=headers,
+            timeout=60
+        )
+        if status_resp.status_code == 200:
+            status = status_resp.json()
+            if isinstance(status, dict):
+                bot_name = status.get('bot_name')
+                if bot_name and bot_name != "freqtrade":
+                    return bot_name
+    except Exception:
+        pass
+    
+    # Last resort: use port-based name
+    return f"Bot-{port}"
+
+def fetch_bot_data(bot):
+    """Fetch data from a single bot"""
+    try:
+        # Auth header
+        import base64
+        auth = base64.b64encode(f"{API_USER}:{API_PASS}".encode()).decode()
+        headers = {"Authorization": f"Basic {auth}"}
+        
+        # V4: Fetch real bot name from freqtrade API
+        real_bot_name = fetch_bot_name(bot['url'], headers)
+        if real_bot_name:
+            bot['name'] = real_bot_name
+            logger.info(f"📝 Using real bot name: {real_bot_name}")
+        else:
+            logger.warning(f"⚠️ Could not fetch bot name, using fallback: {bot.get('name', 'Unknown')}")
+        
+        # Fetch profit data (increased timeout for local server)
+        profit_resp = requests.get(
+            f"{bot['url']}/api/v1/profit",
+            headers=headers,
+            timeout=60
+        )
+        
+        # Fetch status (open trades)
+        status_resp = requests.get(
+            f"{bot['url']}/api/v1/status",
+            headers=headers,
+            timeout=60
+        )
+        
+        # Fetch balance
+        balance_resp = requests.get(
+            f"{bot['url']}/api/v1/balance",
+            headers=headers,
+            timeout=60
+        )
+        
+        data = {
+            'profit': profit_resp.json() if profit_resp.status_code == 200 else {},
+            'status': status_resp.json() if status_resp.status_code == 200 else [],
+            'balance': balance_resp.json() if balance_resp.status_code == 200 else {}
+        }
+        
+        return data
+        
+    except Exception as e:
+        logger.error(f"Error fetching {bot.get('name', bot['url'])}: {e}")
+        return None
+
+def store_snapshot(conn, bot, data):
+    """Store bot snapshot"""
+    try:
+        profit = data.get('profit', {})
+        balance = data.get('balance', {})
+        bot_name = bot.get('name') or bot.get('fallback_name', 'Unknown')
+        
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO bot_snapshots 
+                (bot_name, status, mode, profit_all, profit_closed, winrate,
+                 trade_count, open_trades, balance, max_drawdown, current_drawdown)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                bot_name,
+                'running',
+                'unknown',  # Mode fetched automatically
+                profit.get('profit_all_fiat', 0),
+                profit.get('profit_closed_fiat', 0),
+                profit.get('winrate', 0) * 100,
+                profit.get('trade_count', 0),
+                len(data.get('status', [])),
+                balance.get('total', 0),
+                profit.get('max_drawdown', 0) * 100,
+                profit.get('current_drawdown', 0) * 100
+            ))
+            conn.commit()
+            logger.info(f"✓ Snapshot stored for {bot_name}")
+            
+    except Exception as e:
+        bot_name = bot.get('name') or bot.get('fallback_name', 'Unknown')
+        logger.error(f"Error storing snapshot for {bot_name}: {e}")
+        # Rollback to prevent transaction abort
+        try:
+            conn.rollback()
+        except:
+            pass
+
+def store_daily_performance(conn, bot, data):
+    """Store or update daily performance - with wins/losses tracking"""
+    try:
+        profit = data.get('profit', {})
+        today = datetime.now().date()
+        bot_name = bot.get('name') or bot.get('fallback_name', 'Unknown')
+        
+        # Extract win/loss data from Freqtrade profit API
+        # Handle None values properly - if key exists but is None, use 0
+        winning_trades = profit.get('winning_trades')
+        losing_trades = profit.get('losing_trades')
+        
+        win_count = int(winning_trades) if winning_trades is not None else 0
+        loss_count = int(losing_trades) if losing_trades is not None else 0
+        
+        # DEBUG: Log what we received
+        logger.info(f"DEBUG {bot_name}: winning_trades raw = {winning_trades}, losing_trades raw = {losing_trades}")
+        logger.info(f"DEBUG {bot_name}: win_count = {win_count}, loss_count = {loss_count}")
+        
+        # Calculate win_rate
+        total = win_count + loss_count
+        win_rate = profit.get('win_rate', 0)
+        if not win_rate and total > 0:
+            win_rate = round((win_count / total) * 100, 2)
+        
+        with conn.cursor() as cur:
+            # Upsert daily performance with win_count/loss_count
+            cur.execute("""
+                INSERT INTO daily_performance 
+                (date, bot_name, strategy, profit, total_trades, balance, win_count, loss_count, win_rate)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (date, bot_name) 
+                DO UPDATE SET
+                    profit = EXCLUDED.profit,
+                    total_trades = EXCLUDED.total_trades,
+                    balance = EXCLUDED.balance,
+                    win_count = EXCLUDED.win_count,
+                    loss_count = EXCLUDED.loss_count,
+                    win_rate = EXCLUDED.win_rate
+            """, (
+                today,
+                bot_name,
+                'unknown',
+                profit.get('profit_all_fiat', 0),
+                profit.get('trade_count', 0),
+                data.get('balance', {}).get('total', 0),
+                win_count,
+                loss_count,
+                win_rate
+            ))
+            conn.commit()
+            logger.info(f"✓ {bot_name}: {win_count}W/{loss_count}L ({win_rate}% win rate)")
+            
+    except Exception as e:
+        bot_name = bot.get('name') or bot.get('fallback_name', 'Unknown')
+        logger.error(f"Error storing daily performance for {bot_name}: {e}")
+        # Rollback to prevent transaction abort blocking other bots
+        try:
+            conn.rollback()
+        except:
+            pass
+
+def main():
+    """Main pipeline function"""
+    logger.info("🚀 Starting Freqtrade Analytics Pipeline")
+    logger.info(f"📊 Processing {len(BOTS)} bots")
+    
+    # Connect to database
+    try:
+        conn = get_db_connection()
+        logger.info("✓ Connected to PostgreSQL")
+    except Exception as e:
+        logger.error(f"Failed to connect to database: {e}")
+        return
+    
+    success_count = 0
+    error_count = 0
+    
+    # Process each bot
+    for bot in BOTS:
+        # First fetch data (this also updates bot['name'] with real name from API)
+        data = fetch_bot_data(bot)
+        
+        # Now log with the updated name
+        bot_display = bot.get('name') or bot.get('fallback_name', bot['url'])
+        
+        if data:
+            logger.info(f"📡 Processing {bot_display}...")
+            store_snapshot(conn, bot, data)
+            store_daily_performance(conn, bot, data)
+            success_count += 1
+        else:
+            logger.warning(f"⚠️ Failed to fetch data for {bot_display}")
+            error_count += 1
+    
+    # Cleanup old snapshots (keep 90 days)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM bot_snapshots 
+                WHERE timestamp < NOW() - INTERVAL '90 days'
+            """)
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error cleaning up old snapshots: {e}")
+        # Rollback to prevent transaction abort
+        try:
+            conn.rollback()
+        except:
+            pass
+    
+    conn.close()
+    
+    logger.info(f"✅ Pipeline complete: {success_count} bots processed, {error_count} errors")
+
+if __name__ == "__main__":
+    main()
