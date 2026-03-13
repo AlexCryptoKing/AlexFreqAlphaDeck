@@ -1,4 +1,4 @@
-# 🤖 Multibotdashboard V10 - Complete Installation Guide
+# 🤖 AlexFreqAlphaDeck - Complete Installation Guide
 
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://docker.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)](https://postgresql.org)
