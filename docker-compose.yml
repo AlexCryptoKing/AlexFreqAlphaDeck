@@ -1,0 +1,237 @@
+version: '3.8'
+
+# =============================================================================
+# MULTIBOTDASHBOARD V10 - COMPLETE DOCKER COMPOSE SETUP
+# =============================================================================
+# 
+# This Docker Compose file sets up the complete Multibotdashboard V10 stack:
+# - PostgreSQL Database (both dashboard and analytics DBs in one container)
+# - Redis Cache
+# - Backend API (FastAPI)
+# - Frontend (React + Vite)
+# - Adminer (Database Web GUI)
+#
+# VOLUMES: All bind mounts with RW (read-write) as requested
+# Uses default Docker network
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # POSTGRESQL - Main Database (dashboard + analytics)
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: dashboard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-dashboard}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dashboard}
+      POSTGRES_DB: ${DB_NAME:-dashboard}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      # Main database data - LOCAL BIND MOUNT RW
+      - ./db/postgres_data:/var/lib/postgresql/data:rw
+      # Initialization scripts - RO
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      # Backup directory - RW
+      - ./backup_DB:/backup:rw
+      # Data import - RW
+      - ./data:/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dashboard} -d ${DB_NAME:-dashboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # REDIS - Cache & Session Store
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: dashboard-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      # Redis data - LOCAL BIND MOUNT RW
+      - ./db/redis_data:/data:rw
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # BACKEND - FastAPI Application
+  # ===========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dashboard-backend
+    restart: unless-stopped
+    environment:
+      # Database Configuration (both DBs in one Postgres instance)
+      DATABASE_URL: postgresql://${DB_USER:-dashboard}:${DB_PASSWORD:-dashboard}@postgres:5432/${DB_NAME:-dashboard}
+      
+      # Redis Configuration
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis}@redis:6379/0
+      
+      # Security
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      JWT_ALGORITHM: HS256
+      TOKEN_EXPIRE_MINUTES: 60
+      
+      # Admin Bootstrap (First Run)
+      DASHBOARD_ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      DASHBOARD_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      
+      # Features
+      DISABLE_ALERTS: ${DISABLE_ALERTS:-true}
+      
+      # Freqtrade API Defaults
+      DASHBOARD_API_DEFAULTS__USERNAME: ${FREQTRADE_USERNAME:-}
+      DASHBOARD_API_DEFAULTS__PASSWORD: ${FREQTRADE_PASSWORD:-}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # Python
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      # Docker socket for bot discovery - RW
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      # Freqtrade data access - RW
+      - ${FREQTRADE_BASE_PATH:-/opt}:/opt:rw
+      # Backend code (for development) - RW
+      - ./backend/src:/app/src:rw
+      # Config files - RW
+      - ./config:/app/config:rw
+      # Logs - RW
+      - ./logs:/app/logs:rw
+    # Skip Alembic - tables created by SQL scripts
+    command: >
+      sh -c "uvicorn src.main:app --host 0.0.0.0 --port 8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ===========================================================================
+  # FRONTEND - React Application
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dashboard-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8000}/api/v1
+      VITE_WS_URL: ws://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8000}/api/v1/ws
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+    ports:
+      - "${FRONTEND_PORT:-5000}:5000"
+    volumes:
+      # Mount src for development (node_modules stays in image)
+      - ./frontend:/app:rw
+    depends_on:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # DATA-COLLECTOR - Analytics Pipeline
+  # ===========================================================================
+  data-collector:
+    image: python:3.11-slim
+    container_name: dashboard-data-collector
+    restart: unless-stopped
+    environment:
+      # Database Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-dashboard}
+      DB_PASSWORD: ${DB_PASSWORD:-dashboard}
+      DB_NAME: financial_data
+      DATABASE_URL: postgresql://${DB_USER:-dashboard}:${DB_PASSWORD:-dashboard}@postgres:5432/financial_data
+      
+      # Freqtrade connections
+      FREQTRADE_BASE_PATH: ${FREQTRADE_BASE_PATH:-/opt}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      # Data collector code - RW
+      - ./data_collector:/app:rw
+      # Freqtrade data access - RW
+      - ${FREQTRADE_BASE_PATH:-/opt}:/opt:rw
+      # Logs - RW
+      - ./logs:/app/logs:rw
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir requests psycopg2-binary && 
+             while true; do 
+               python3 analytics_pipeline.py; 
+               sleep 300; 
+             done"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # ADMINER - Database Web GUI
+  # ===========================================================================
+  adminer:
+    image: adminer:latest
+    container_name: dashboard-adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8090}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha
+      ADMINER_PLUGINS: "tables-filter tinymce"
+    depends_on:
+      - postgres
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
