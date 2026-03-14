@@ -34,6 +34,10 @@ from src.services.ftmanager.config import AppConfig, StrategyConfig
 app_state: Optional[AppState] = None
 workflow_engine: Optional[Workflow] = None
 hyperopt_monitor: Optional[HyperoptMonitor] = None
+async def async_subprocess_run(cmd, **kwargs):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, lambda: subprocess.run(cmd, **kwargs))
+
 
 
 @router.on_event("startup")
@@ -264,7 +268,7 @@ async def start_workflow(
                     "--export-filename", container_export_path
                 ]
                 logger.info(f"Docker command: {' '.join(cmd)}")
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+                result = await async_subprocess_run(cmd, capture_output=True, text=True, timeout=3600)
                 
                 # ALWAYS save raw results first (for debugging)
                 try:
@@ -450,7 +454,7 @@ async def start_workflow(
                     # AUTO-IMPORT: Use raw log importer
                     try:
                         logger.info(f"Auto-importing backtest results for {strategy_name}")
-                        result = subprocess.run(
+                        result = await async_subprocess_run(
                             ['python3', '/opt/Multibotdashboard/scripts/import-meta-backtests.py'],
                             capture_output=True,
                             text=True,
@@ -516,7 +520,7 @@ async def start_workflow(
                     "-j", "4"
                 ]
                 logger.info(f"Docker command: {' '.join(cmd)}")
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+                result = await async_subprocess_run(cmd, capture_output=True, text=True, timeout=7200)
                 
                 # ALWAYS save raw results (like backtest)
                 try:
@@ -660,7 +664,7 @@ async def start_workflow(
                     # AUTO-IMPORT: Also run import script (for consistency)
                     try:
                         logger.info(f"Auto-importing hyperopt results for {strategy_name}")
-                        result_import = subprocess.run(
+                        result_import = await async_subprocess_run(
                             ['python3', '/opt/Multibotdashboard/scripts/import-hyperopt.py'],
                             capture_output=True,
                             text=True,
