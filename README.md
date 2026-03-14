@@ -445,11 +445,11 @@ docker volume prune
 
 ---
 
-## 🤝 Support
+## 🤝 Contributing
+Contacts: 
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/multibotdashboard-v10/issues)
-- **Documentation**: [Full Docs](https://docs.yourdomain.com)
-- **Discord**: [Join Community](https://discord.gg/yourinvite)
+[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/alex15_08)
+[![Discord](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/tju4JSDBTE)
 
 ---
 
@@ -461,5 +461,5 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 <p align="center">
   Made with ❤️ for the Freqtrade community<br>
-  <strong>Multibotdashboard V10</strong>
+  <strong>AlexFreqAlphaDeck</strong>
 </p>
